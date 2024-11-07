@@ -37,10 +37,8 @@ TEST(book_tests, can_match_buy_to_sell)
     auto sid = b.limit_sell(100, 100);
     auto bid = b.limit_buy(100, 100);
 
-
-    EXPECT_TRUE(std::get<0>(cbs[0]) == sid || std::get<0>(cbs[0]) == bid);
-    EXPECT_TRUE(std::get<0>(cbs[1]) == sid || std::get<0>(cbs[1]) == bid);
-    EXPECT_NE(std::get<0>(cbs[0]), std::get<0>(cbs[1]));
+    EXPECT_TRUE(std::get<0>(cbs[0]) == sid);
+    EXPECT_EQ(bid, -1);
 }
 
 TEST(book_tests, can_match_sell_to_buy)
@@ -53,12 +51,10 @@ TEST(book_tests, can_match_sell_to_buy)
     };
     b.post_order_complete_callback(std::function(cb));
 
-    auto sid = b.limit_buy(100, 100);
-    auto bid = b.limit_sell(100, 100);
+    auto bid = b.limit_buy(100, 100);
+    auto sid = b.limit_sell(100, 100);
 
-
-    EXPECT_TRUE(std::get<0>(cbs[0]) == sid || std::get<0>(cbs[0]) == bid);
-    EXPECT_TRUE(std::get<0>(cbs[1]) == sid || std::get<0>(cbs[1]) == bid);
-    EXPECT_NE(std::get<0>(cbs[0]), std::get<0>(cbs[1]));
+    EXPECT_TRUE(std::get<0>(cbs[0]) == bid);
+    EXPECT_EQ(sid, -1);
 }
 
