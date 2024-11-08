@@ -47,6 +47,24 @@ private:
     order_complete_cb _cb;
     std::set<order*, decltype([](order* lhs, order* rhs){ return lhs->price > rhs->price; })> buy_book;
     std::set<order*, decltype([](order* lhs, order* rhs){ return lhs->price < rhs->price; })> sell_book; // Take advantage of RB tree used to order set.
+    std::map<order_id, order*> order_list;
+
+    template <order_type OrderType>
+    requires (OrderType == order_type::LIM_BUY)
+    auto get_opposing_order_book()
+    {
+        return sell_book;
+    }
+
+    template <order_type OrderType>
+    requires (OrderType == order_type::LIM_SELL)
+    auto get_opposing_order_book()
+    {
+        return buy_book;
+    }
+
+    template <order_type OrderType>
+    auto common_add_order(order_size, order_price) -> order_size;
 };
 
 union uuid_hack
@@ -69,33 +87,60 @@ auto build_order(order_type type, order_size size, order_price price) -> order*
     return o;
 }
 
-auto book::limit_buy(order_size size, order_price price) -> order_id
+template <order_type OrderType>
+requires (OrderType == order_type::LIM_BUY)
+constexpr auto get_is_better()
 {
+    return [](order_price buy, order_price sell) { return buy >= sell; };
+}
+
+template <order_type OrderType>
+requires (OrderType == order_type::LIM_SELL)
+constexpr auto get_is_better()
+{
+    return [](order_price sell, order_price buy) { return sell <= buy; };
+}
+
+template <order_type OrderType>
+auto book::common_add_order(order_size size, order_price price) -> order_size
+{
+    order* best;
+    auto opposing_book = get_opposing_order_book<OrderType>();
+    constexpr auto better = get_is_better<OrderType>();
+
     while (size)
     {
-        auto best_sell = *sell_book.begin();
+        auto best = *(opposing_book.begin());
 
-        if (!best_sell)
+        if (!best)
             break;
 
-        if (price >= best_sell->price)
+        if (better(price, best->price))
         {
-            if (size >= best_sell->size)
+            if (size >= best->size)
             {
-                sell_book.erase(best_sell);
-                size -= best_sell->size;
-                _cb(best_sell->id, best_sell->size, best_sell->price);
-                delete best_sell;
+                opposing_book.erase(best);
+
+                size -= best->size;
+                _cb(best->id, best->size, best->price);
+                delete best;
             }
             else
             {
-                best_sell->size -= size;
+                best->size -= size;
                 size = 0;
             }
         }
         else
             break;
     }
+
+    return size;
+}
+
+auto book::limit_buy(order_size size, order_price price) -> order_id
+{
+    size = common_add_order<order_type::LIM_BUY>(size, price);
 
     if (!size)
         return -1;
@@ -106,31 +151,7 @@ auto book::limit_buy(order_size size, order_price price) -> order_id
 }
 auto book::limit_sell(order_size size, order_price price) -> order_id
 {
-    while (size)
-    {
-        auto best_buy = *buy_book.begin();
-
-        if (!best_buy)
-            break;
-
-        if (price <= best_buy->price)
-        {
-            if (size >= best_buy->size)
-            {
-                sell_book.erase(best_buy);
-                size -= best_buy->size;
-                _cb(best_buy->id, best_buy->size, best_buy->price);
-                delete best_buy;
-            }
-            else
-            {
-                best_buy->size -= size;
-                size = 0;
-            }
-        }
-        else
-            break;
-    }
+    size = common_add_order<order_type::LIM_SELL>(size, price);
 
     if (!size)
         return -1;
