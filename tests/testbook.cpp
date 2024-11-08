@@ -50,7 +50,7 @@ TEST(book_tests, can_match_buy_to_sell)
     auto sid = b.limit_sell(100, 100);
     auto bid = b.limit_buy(100, 100);
 
-    EXPECT_TRUE(std::get<0>(cbs[0]) == sid);
+    EXPECT_EQ(std::get<0>(cbs[0]), sid);
     EXPECT_EQ(bid, -1);
 }
 
@@ -67,7 +67,7 @@ TEST(book_tests, can_match_sell_to_buy)
     auto bid = b.limit_buy(100, 100);
     auto sid = b.limit_sell(100, 100);
 
-    EXPECT_TRUE(std::get<0>(cbs[0]) == bid);
+    EXPECT_EQ(std::get<0>(cbs[0]), bid);
     EXPECT_EQ(sid, -1);
 }
 
@@ -161,4 +161,25 @@ TEST(book_tests, matches_buy_to_earliest_valid_sell)
     EXPECT_EQ(std::get<1>(cbs[0]), 100);
     EXPECT_EQ(std::get<2>(cbs[0]), 100);
     EXPECT_EQ(bid, -1);
+}
+
+TEST(book_tests, can_cancel_buy)
+{
+    book b;
+    auto bid = b.limit_buy(100, 100);
+    ASSERT_TRUE(b.cancel_order(bid));
+}
+
+TEST(book_tests, can_cancel_sell)
+{
+    book b;
+    auto sid = b.limit_sell(100, 100);
+    ASSERT_TRUE(b.cancel_order(sid));
+}
+
+TEST(book_tests, cannot_cancel_bad_id)
+{
+    book b;
+    auto sid = b.limit_sell(100, 100);
+    ASSERT_FALSE(b.cancel_order(101));
 }

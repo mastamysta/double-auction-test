@@ -38,7 +38,7 @@ public:
 
     auto fok_sell(order_size, order_price) -> order_id; // UNSUPPORTED
 
-    auto cancel_order(order_id id) -> void;
+    auto cancel_order(order_id id) -> bool;
 
     auto post_order_complete_callback(order_complete_cb) -> void;
 
@@ -51,14 +51,28 @@ private:
 
     template <order_type OrderType>
     requires (OrderType == order_type::LIM_BUY)
-    auto get_opposing_order_book()
+    auto& get_order_book()
+    {
+        return buy_book;
+    }
+
+    template <order_type OrderType>
+    requires (OrderType == order_type::LIM_SELL)
+    auto& get_order_book()
+    {
+        return sell_book;
+    }
+
+    template <order_type OrderType>
+    requires (OrderType == order_type::LIM_BUY)
+    auto& get_opposing_order_book()
     {
         return sell_book;
     }
 
     template <order_type OrderType>
     requires (OrderType == order_type::LIM_SELL)
-    auto get_opposing_order_book()
+    auto& get_opposing_order_book()
     {
         return buy_book;
     }
@@ -73,7 +87,8 @@ union uuid_hack
     order_id id;
 };
 
-auto build_order(order_type type, order_size size, order_price price) -> order*
+template <order_type OrderType>
+auto build_order(order_size size, order_price price) -> order*
 {   
     auto o = new order;
     uuid_hack id;
@@ -82,7 +97,7 @@ auto build_order(order_type type, order_size size, order_price price) -> order*
     o->id = id.id;
     o->size = size;
     o->price = price;
-    o->type = type;
+    o->type = OrderType;
 
     return o;
 }
@@ -102,7 +117,7 @@ constexpr auto get_is_better()
 }
 
 template <order_type OrderType>
-auto book::common_add_order(order_size size, order_price price) -> order_size
+auto book::common_add_order(order_size size, order_price price) -> order_id
 {
     order* best;
     auto opposing_book = get_opposing_order_book<OrderType>();
@@ -120,13 +135,14 @@ auto book::common_add_order(order_size size, order_price price) -> order_size
             if (size >= best->size)
             {
                 opposing_book.erase(best);
-
+                order_list.erase(best->id);
                 size -= best->size;
                 _cb(best->id, best->size, best->price);
                 delete best;
             }
             else
             {
+                _cb(best->id, best->size - size, best->price);
                 best->size -= size;
                 size = 0;
             }
@@ -134,31 +150,24 @@ auto book::common_add_order(order_size size, order_price price) -> order_size
         else
             break;
     }
+    
+    if (!size)
+        return -1;
 
-    return size;
+    auto& same_book = get_order_book<OrderType>();
+    auto o = build_order<OrderType>(size, price);
+    same_book.insert(o);
+    order_list[o->id] = o;
+    return o->id;  
 }
 
 auto book::limit_buy(order_size size, order_price price) -> order_id
 {
-    size = common_add_order<order_type::LIM_BUY>(size, price);
-
-    if (!size)
-        return -1;
-
-    auto o = build_order(order_type::LIM_BUY, size, price);
-    buy_book.insert(o);
-    return o->id;  
+    return common_add_order<order_type::LIM_BUY>(size, price);
 }
 auto book::limit_sell(order_size size, order_price price) -> order_id
 {
-    size = common_add_order<order_type::LIM_SELL>(size, price);
-
-    if (!size)
-        return -1;
-
-    auto o = build_order(order_type::LIM_SELL, size, price);
-    sell_book.insert(o);
-    return o->id;
+    return common_add_order<order_type::LIM_SELL>(size, price);
 }
 auto book::fok_buy(order_size, order_price) -> order_id
 {
@@ -171,9 +180,22 @@ auto book::fok_sell(order_size, order_price) -> order_id
     return 0;   
 }
 
-auto book::cancel_order(order_id id) -> void
+auto book::cancel_order(order_id id) -> bool
 {
-    return;   
+    if (order_list.find(id) == order_list.end())
+        return false;
+
+    auto o = order_list[id];
+    order_list.erase(id);
+
+    if (o->type == order_type::LIM_BUY)
+        buy_book.erase(o);
+    else
+        sell_book.erase(o);
+
+    delete o;
+
+    return true;   
 }
 
 auto book::post_order_complete_callback(order_complete_cb cb) -> void
