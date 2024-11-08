@@ -158,7 +158,7 @@ auto book::limit_sell(order_size size, order_price price) -> order_id
 
     auto o = build_order(order_type::LIM_SELL, size, price);
     sell_book.insert(o);
-    return o->id;;
+    return o->id;
 }
 auto book::fok_buy(order_size, order_price) -> order_id
 {

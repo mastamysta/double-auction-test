@@ -58,3 +58,46 @@ TEST(book_tests, can_match_sell_to_buy)
     EXPECT_EQ(sid, -1);
 }
 
+TEST(book_tests, matches_best_existing_buy_to_sell)
+{
+    book b;
+    std::vector<std::tuple<order_id, order_size, order_price>> cbs;
+    auto cb = [&](order_id id, order_size s, order_price p){
+        cbs.push_back({ id, s, p});
+        return 0;
+    };
+    b.post_order_complete_callback(std::function(cb));
+
+    b.limit_buy(100, 80);
+    auto bid = b.limit_buy(100, 200);
+    b.limit_buy(100, 130);
+    b.limit_buy(100, 150);
+
+    auto sid = b.limit_sell(100, 100);
+
+    EXPECT_EQ(std::get<0>(cbs[0]), bid);
+    //EXPECT_EQ(std::get<0>(cbs[2]), 200);
+    EXPECT_EQ(sid, -1);
+}
+
+TEST(book_tests, matches_best_existing_sell_to_buy)
+{
+    book b;
+    std::vector<std::tuple<order_id, order_size, order_price>> cbs;
+    auto cb = [&](order_id id, order_size s, order_price p){
+        cbs.push_back({ id, s, p});
+        return 0;
+    };
+    b.post_order_complete_callback(std::function(cb));
+
+    b.limit_sell(100, 250);
+    auto sid = b.limit_sell(100, 100);
+    b.limit_sell(100, 1700);
+    b.limit_sell(100, 140);
+
+    auto bid = b.limit_buy(100, 200);
+
+    EXPECT_EQ(std::get<0>(cbs[0]), sid);
+    EXPECT_EQ(bid, -1);
+}
+
