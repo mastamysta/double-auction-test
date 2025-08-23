@@ -179,7 +179,46 @@ TEST(book_tests, can_cancel_sell)
 
 TEST(book_tests, cannot_cancel_bad_id)
 {
-    book b;//
+    book b;
     auto sid = b.limit_sell(100, 100);
     ASSERT_FALSE(b.cancel_order(101));
+}
+
+TEST(book_tests, can_fok_sell)
+{
+    book b;
+
+    std::vector<std::tuple<order_id, order_size, order_price>> cbs;
+    auto cb = [&](order_id id, order_size s, order_price p){
+        cbs.push_back({ id, s, p});
+        return 0;
+    };
+    b.post_order_complete_callback(std::function(cb));
+
+    auto bid = b.limit_buy(100, 100);
+    auto fok_success = b.fok_sell(50, 25);
+
+    EXPECT_EQ(std::get<0>(cbs[0]), bid);
+    EXPECT_EQ(std::get<1>(cbs[0]), 50); // Size
+    EXPECT_EQ(std::get<2>(cbs[0]), 100); // Price
+
+    ASSERT_TRUE(fok_success);
+}
+
+TEST(book_tests, doesnt_fill_with_worse_price)
+{
+    book b;
+
+    std::vector<std::tuple<order_id, order_size, order_price>> cbs;
+    auto cb = [&](order_id id, order_size s, order_price p){
+        cbs.push_back({ id, s, p});
+        return 0;
+    };
+    b.post_order_complete_callback(std::function(cb));
+
+    auto bid = b.limit_buy(100, 100);
+    auto fok_success = b.fok_sell(50, 125);
+
+    ASSERT_TRUE(cbs.empty());
+    ASSERT_FALSE(fok_success);
 }

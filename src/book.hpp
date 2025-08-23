@@ -5,6 +5,8 @@
 #include <queue>
 #include <set>
 #include <map>
+#include <format>
+#include <iostream>
 
 #include <uuid/uuid.h>
 
@@ -16,7 +18,9 @@ using order_complete_cb = std::function<int(order_id, order_size, order_price)>;
 enum class order_type
 {
     LIM_BUY,
-    LIM_SELL
+    LIM_SELL,
+    FOK_BUY,
+    FOK_SELL
 };
 
 struct order
@@ -38,9 +42,9 @@ public:
 
     auto limit_sell(order_size, order_price) -> order_id;
 
-    auto fok_buy(order_size, order_price) -> order_id; // UNSUPPORTED
+    auto fok_buy(order_size, order_price) -> bool;
 
-    auto fok_sell(order_size, order_price) -> order_id; // UNSUPPORTED
+    auto fok_sell(order_size, order_price) -> bool;
 
     auto cancel_order(order_id id) -> bool;
 
@@ -54,28 +58,28 @@ private:
     std::map<order_id, order*> order_list;
 
     template <order_type OrderType>
-    requires (OrderType == order_type::LIM_BUY)
+    requires (OrderType == order_type::LIM_BUY || OrderType == order_type::FOK_BUY)
     auto& get_order_book()
     {
         return buy_book;
     }
 
     template <order_type OrderType>
-    requires (OrderType == order_type::LIM_SELL)
+    requires (OrderType == order_type::LIM_SELL || OrderType == order_type::FOK_SELL)
     auto& get_order_book()
     {
         return sell_book;
     }
 
     template <order_type OrderType>
-    requires (OrderType == order_type::LIM_BUY)
+    requires (OrderType == order_type::LIM_BUY || OrderType == order_type::FOK_BUY)
     auto& get_opposing_order_book()
     {
         return sell_book;
     }
 
     template <order_type OrderType>
-    requires (OrderType == order_type::LIM_SELL)
+    requires (OrderType == order_type::LIM_SELL || OrderType == order_type::FOK_SELL)
     auto& get_opposing_order_book()
     {
         return buy_book;
@@ -83,6 +87,12 @@ private:
 
     template <order_type OrderType>
     auto common_add_order(order_size, order_price) -> order_size;
+
+    template <order_type OrderType>
+    auto common_fok_order(order_size, order_price) -> bool;
+
+    template <order_type OrderType>
+    auto action(order_size, order_price, bool);
 };
 
 union uuid_hack
@@ -107,62 +117,97 @@ auto inline build_order(order_size size, order_price price) -> order*
 }
 
 template <order_type OrderType>
-requires (OrderType == order_type::LIM_BUY)
+requires (OrderType == order_type::LIM_BUY || OrderType == order_type::FOK_BUY)
 constexpr inline auto get_is_better()
 {
     return [](order_price buy, order_price sell) { return buy >= sell; };
 }
 
 template <order_type OrderType>
-requires (OrderType == order_type::LIM_SELL)
+requires (OrderType == order_type::LIM_SELL || OrderType == order_type::FOK_SELL)
 constexpr inline auto get_is_better()
 {
     return [](order_price sell, order_price buy) { return sell <= buy; };
 }
 
 template <order_type OrderType>
-inline auto book::common_add_order(order_size size, order_price price) -> order_id
+inline auto book::action(order_size size, order_price price, bool dry_run)
 {
-    order* best;
     auto opposing_book = get_opposing_order_book<OrderType>();
     constexpr auto better = get_is_better<OrderType>();
+    bool erase_last = true;
+    auto best = opposing_book.begin();
 
     while (size)
     {
-        auto best = *(opposing_book.begin());
-
-        if (!best)
+        if (best == opposing_book.end())
             break;
 
-        if (better(price, best->price))
+        if (better(price, (*best)->price))
         {
-            if (size >= best->size)
+            if (size >= (*best)->size)
             {
-                opposing_book.erase(best);
-                order_list.erase(best->id);
-                size -= best->size;
-                _cb(best->id, best->size, best->price);
-                delete best;
+                size -= (*best)->size;
+
+                if (!dry_run)
+                {
+                    _cb((*best)->id, (*best)->size, (*best)->price);
+                    order_list.erase((*best)->id);
+                    delete *best;
+                }
             }
             else
             {
-                _cb(best->id, best->size - size, best->price);
-                best->size -= size;
+                if (!dry_run)
+                {
+                    _cb((*best)->id, (*best)->size - size, (*best)->price);
+                    (*best)->size -= size;
+                }
+
                 size = 0;
+                best++;
+                break;
             }
         }
         else
             break;
+
+        best++;
     }
+
+    if (!dry_run)
+    {
+        opposing_book.erase(opposing_book.begin(), best);
+    }
+
+    return size;
+}
+
+template <order_type OrderType>
+inline auto book::common_add_order(order_size size, order_price price) -> order_id
+{
+    auto remaining_size = action<OrderType>(size, price, false);
     
-    if (!size)
+    if (!remaining_size)
         return -1;
 
     auto& same_book = get_order_book<OrderType>();
-    auto o = build_order<OrderType>(size, price);
+    auto o = build_order<OrderType>(remaining_size, price);
     same_book.insert(o);
     order_list[o->id] = o;
     return o->id;  
+}
+
+template <order_type OrderType>
+inline auto book::common_fok_order(order_size size, order_price price) -> bool
+{
+    auto remaining_size = action<OrderType>(size, price, true);
+    
+    if (remaining_size)
+        return false;
+
+    action<OrderType>(size, price, false);
+    return true;
 }
 
 inline auto book::limit_buy(order_size size, order_price price) -> order_id
@@ -173,15 +218,13 @@ inline auto book::limit_sell(order_size size, order_price price) -> order_id
 {
     return common_add_order<order_type::LIM_SELL>(size, price);
 }
-inline auto book::fok_buy(order_size, order_price) -> order_id
+inline auto book::fok_buy(order_size size, order_price price) -> bool
 {
-    // UNSUPPORTED
-    return 0;   
+    return common_fok_order<order_type::FOK_BUY>(size, price);
 }
-inline auto book::fok_sell(order_size, order_price) -> order_id
+inline auto book::fok_sell(order_size size, order_price price) -> bool
 {
-    // UNSUPPORTED
-    return 0;   
+    return common_fok_order<order_type::FOK_SELL>(size, price);
 }
 
 inline auto book::cancel_order(order_id id) -> bool
