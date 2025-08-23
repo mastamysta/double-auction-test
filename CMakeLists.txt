@@ -3,6 +3,6 @@ project(minimarket)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_subdirectory(src)
+add_subdirectory(book)
 add_subdirectory(extern)
 add_subdirectory(tests)
