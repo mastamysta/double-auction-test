@@ -4,6 +4,7 @@
 #include <functional>
 #include <queue>
 #include <set>
+#include <map>
 
 #include <uuid/uuid.h>
 
@@ -26,6 +27,9 @@ struct order
     order_type type;
 };
 
+inline auto better_buy = [](order* lhs, order* rhs){ return lhs->price > rhs->price; };
+inline auto better_sell = [](order* lhs, order* rhs){ return lhs->price < rhs->price; };
+
 class book
 {
 public:
@@ -45,8 +49,8 @@ public:
 private:
 
     order_complete_cb _cb;
-    std::set<order*, decltype([](order* lhs, order* rhs){ return lhs->price > rhs->price; })> buy_book;
-    std::set<order*, decltype([](order* lhs, order* rhs){ return lhs->price < rhs->price; })> sell_book; // Take advantage of RB tree used to order set.
+    std::set<order*, decltype(better_buy)> buy_book;
+    std::set<order*, decltype(better_sell)> sell_book; // Take advantage of RB tree used to order set.
     std::map<order_id, order*> order_list;
 
     template <order_type OrderType>
@@ -88,7 +92,7 @@ union uuid_hack
 };
 
 template <order_type OrderType>
-auto build_order(order_size size, order_price price) -> order*
+auto inline build_order(order_size size, order_price price) -> order*
 {   
     auto o = new order;
     uuid_hack id;
@@ -104,20 +108,20 @@ auto build_order(order_size size, order_price price) -> order*
 
 template <order_type OrderType>
 requires (OrderType == order_type::LIM_BUY)
-constexpr auto get_is_better()
+constexpr inline auto get_is_better()
 {
     return [](order_price buy, order_price sell) { return buy >= sell; };
 }
 
 template <order_type OrderType>
 requires (OrderType == order_type::LIM_SELL)
-constexpr auto get_is_better()
+constexpr inline auto get_is_better()
 {
     return [](order_price sell, order_price buy) { return sell <= buy; };
 }
 
 template <order_type OrderType>
-auto book::common_add_order(order_size size, order_price price) -> order_id
+inline auto book::common_add_order(order_size size, order_price price) -> order_id
 {
     order* best;
     auto opposing_book = get_opposing_order_book<OrderType>();
@@ -161,26 +165,26 @@ auto book::common_add_order(order_size size, order_price price) -> order_id
     return o->id;  
 }
 
-auto book::limit_buy(order_size size, order_price price) -> order_id
+inline auto book::limit_buy(order_size size, order_price price) -> order_id
 {
     return common_add_order<order_type::LIM_BUY>(size, price);
 }
-auto book::limit_sell(order_size size, order_price price) -> order_id
+inline auto book::limit_sell(order_size size, order_price price) -> order_id
 {
     return common_add_order<order_type::LIM_SELL>(size, price);
 }
-auto book::fok_buy(order_size, order_price) -> order_id
+inline auto book::fok_buy(order_size, order_price) -> order_id
 {
     // UNSUPPORTED
     return 0;   
 }
-auto book::fok_sell(order_size, order_price) -> order_id
+inline auto book::fok_sell(order_size, order_price) -> order_id
 {
     // UNSUPPORTED
     return 0;   
 }
 
-auto book::cancel_order(order_id id) -> bool
+inline auto book::cancel_order(order_id id) -> bool
 {
     if (order_list.find(id) == order_list.end())
         return false;
@@ -198,7 +202,7 @@ auto book::cancel_order(order_id id) -> bool
     return true;   
 }
 
-auto book::post_order_complete_callback(order_complete_cb cb) -> void
+inline auto book::post_order_complete_callback(order_complete_cb cb) -> void
 {
     _cb = cb;
     return;

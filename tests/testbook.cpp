@@ -179,7 +179,7 @@ TEST(book_tests, can_cancel_sell)
 
 TEST(book_tests, cannot_cancel_bad_id)
 {
-    book b;
+    book b;//
     auto sid = b.limit_sell(100, 100);
     ASSERT_FALSE(b.cancel_order(101));
 }
