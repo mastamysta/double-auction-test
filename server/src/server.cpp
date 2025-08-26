@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <poll.h>
 
 // C++
 #include <iostream>
@@ -10,6 +11,7 @@
 #include <expected>
 #include <string>
 #include <type_traits>
+#include <functional>
 
 #include "book.hpp"
 #include "character_buffer.hpp"
@@ -54,12 +56,11 @@ public:
         }
     }
 
+    // Taking a copy of a file descriptor is not meaningful.
     UDSBookServer(const UDSBookServer& other) = delete;
-
     UDSBookServer operator=(const UDSBookServer& other) = delete;
 
     UDSBookServer(UDSBookServer&& other) = delete;
-
     UDSBookServer operator=(UDSBookServer&& other) = delete;
 
     ~UDSBookServer()
@@ -67,7 +68,29 @@ public:
         close(m_socket);
     }
 
-    auto wait_msg(T& received_object) const -> std::expected<void, ListenError>
+    auto post_on_recv_callback(std::function<void(const T&)> recv_callback)
+    {
+        m_recv_callback = recv_callback;
+    }
+
+    auto start_server() const -> std::expected<void, ListenError>
+    {
+        auto ret = std::expected<void, ListenError>{};
+
+        while(ret = wait_msg()) { ; }
+
+        return ret;
+    }
+
+private:
+    static constexpr int MAX_QUEUE_LEN = 128;
+    const char *SOCKET_PATH = "foobar";
+    static constexpr int DEFAULT_PROTOCOL = 0;
+
+    int m_socket;
+    std::function<void(const T&)> m_recv_callback;
+
+    auto wait_msg() const -> std::expected<void, ListenError>
     {
         struct sockaddr peer_addr;
         socklen_t other_addrlen;
@@ -79,22 +102,21 @@ public:
             return std::unexpected{ListenError::AcceptFailed};
         }
 
-        if (recv(newsock, reinterpret_cast<T*>(&received_object), sizeof(T), 0) == -1)
+        auto received_object = T{};
+
+        if (recv(newsock, &received_object, sizeof(T), 0) == -1)
         {
             std::cout << std::format("Unable to read socket. Errno: {}\n", errno);
             return std::unexpected{ListenError::RecvFailed};
         }
 
+        if (m_recv_callback)
+            m_recv_callback(received_object);
+
         close(newsock);
 
         return {};
     }
-
-private:
-    static constexpr int MAX_QUEUE_LEN = 128;
-    const char *SOCKET_PATH = "foobar";
-    static constexpr int DEFAULT_PROTOCOL = 0;
-    int m_socket;
 
 };
 
@@ -115,16 +137,16 @@ struct std::formatter<UDSBookServer<StringBufferWithMetaData>::ListenError>
 int main(int argc, const char *argv[])
 {
     auto server = UDSBookServer<StringBufferWithMetaData>{};
-    
-    auto data = StringBufferWithMetaData{};
-    
-    if (auto ret = server.wait_msg(data)) 
-    {
+
+    auto on_recv_callback = [](auto data){
         std::cout << std::format("Protocol: {}\nMessage: {}\nClient ID: {}\n",
                                  data.protocol_id,
                                  data.buffer,
                                  data.client_id);
-    }
+    };
+    server.post_on_recv_callback(on_recv_callback);
+
+    if (auto ret = server.start_server()) {}
     else
     {
         std::cout << std::format("wait_msg() failed. {}\n", ret.error());
