@@ -11,7 +11,9 @@
 #include <string>
 
 #include "book.hpp"
+#include "character_buffer.hpp"
 
+template <typename T>
 class UDSBookServer
 {
 public:
@@ -33,9 +35,9 @@ public:
         struct sockaddr_un addr;
         memset(&addr, 0, sizeof(struct sockaddr_un));
         addr.sun_family = AF_UNIX;
-        strncpy(addr.sun_path, SOCKET_PATH.c_str(), sizeof(SOCKET_PATH.length()) - 1);
+        strncpy(addr.sun_path, SOCKET_PATH, sizeof(SOCKET_PATH) - 1);
 
-        unlink(SOCKET_PATH.c_str());
+        unlink(SOCKET_PATH);
 
         if (bind(m_socket, 
                 (struct sockaddr *)&addr,
@@ -63,8 +65,7 @@ public:
         close(m_socket);
     }
 
-    template <size_t BUFFER_LENGTH>
-    auto wait_msg(std::array<char, BUFFER_LENGTH>& buffer) const -> std::expected<void, ListenError>
+    auto wait_msg(T& received_object) const -> std::expected<void, ListenError>
     {
         struct sockaddr peer_addr;
         socklen_t other_addrlen;
@@ -76,7 +77,7 @@ public:
             return std::unexpected{ListenError::AcceptFailed};
         }
 
-        if (recv(newsock, buffer.data(), BUFFER_LENGTH-1, 0) == -1)
+        if (recv(newsock, reinterpret_cast<T*>(&received_object), sizeof(T), 0) == -1)
         {
             std::cout << std::format("Unable to read socket. Errno: {}\n", errno);
             return std::unexpected{ListenError::RecvFailed};
@@ -84,27 +85,26 @@ public:
 
         close(newsock);
 
-        std::cout << std::format("Message: {}\n", buffer.data());
-
         return {};
     }
 
 private:
     static constexpr int MAX_QUEUE_LEN = 128;
-    static constexpr std::string SOCKET_PATH = "foobar";
+    const char *SOCKET_PATH = "foobar";
     static constexpr int DEFAULT_PROTOCOL = 0;
     int m_socket;
+
 };
 
 template<>
-struct std::formatter<UDSBookServer::ListenError>
+struct std::formatter<UDSBookServer<StringBufferWithMetaData>::ListenError>
 {
     constexpr auto parse(std::format_parse_context& context)
     {
         return context.begin();
     }
 
-    auto format(const UDSBookServer::ListenError& err, std::format_context& context) const
+    auto format(const UDSBookServer<StringBufferWithMetaData>::ListenError& err, std::format_context& context) const
     {
         return std::format_to(context.out(), "{}", "Some_fooey_error");
     }
@@ -112,11 +112,17 @@ struct std::formatter<UDSBookServer::ListenError>
 
 int main(int argc, const char *argv[])
 {
-    UDSBookServer server{};
-
-    std::array<char, 255> retbuf;
+    auto server = UDSBookServer<StringBufferWithMetaData>{};
     
-    if (auto ret = server.wait_msg(retbuf)) {}
+    auto data = StringBufferWithMetaData{};
+    
+    if (auto ret = server.wait_msg(data)) 
+    {
+        std::cout << std::format("Protocol: {}\nMessage: {}\nClient ID: {}\n",
+                                 data.protocol_id,
+                                 data.buffer,
+                                 data.client_id);
+    }
     else
     {
         std::cout << std::format("wait_msg() failed. {}\n", ret.error());

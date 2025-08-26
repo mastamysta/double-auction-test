@@ -9,7 +9,9 @@
 #include <iostream>
 #include <expected>
 
+#include "character_buffer.hpp"
 
+template <typename T>
 class UDSClient
 {
 public:
@@ -40,13 +42,12 @@ public:
         close(m_socket);
     }
 
-    template <size_t BUFFER_LENGTH>
-    auto send_msg(std::array<char, BUFFER_LENGTH> buffer) const -> std::expected<void, SendError>
+    auto send_msg(const T& data) const -> std::expected<void, SendError>
     {
-        struct sockaddr_un addr;
+        auto addr = sockaddr_un{};
         memset(&addr, 0, sizeof(struct sockaddr_un));
         addr.sun_family = AF_UNIX;
-        strncpy(addr.sun_path, SOCKET_PATH.c_str(), sizeof(SOCKET_PATH.length()) - 1);
+        strncpy(addr.sun_path, SOCKET_PATH, sizeof(SOCKET_PATH) - 1);
 
         if (connect(m_socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) == -1)
         {
@@ -54,7 +55,7 @@ public:
             return std::unexpected(SendError::ConnectFailed);
         }
 
-        if (send(m_socket, buffer.data(), BUFFER_LENGTH+1, 0) == -1)
+        if (send(m_socket, reinterpret_cast<const char*>(&data), sizeof(T), 0) == -1)
         {
             std::cout << std::format("Failed to write to socket {}\n", errno);
             return std::unexpected(SendError::SendFailed);
@@ -64,7 +65,7 @@ public:
     }
 
 private:
-    static constexpr std::string SOCKET_PATH = "foobar";
+    const char *SOCKET_PATH = "foobar";
     static constexpr int DEFAULT_PROTOCOL = 0;
 
     int m_socket;
@@ -73,13 +74,13 @@ private:
 
 int main(int argc, const char *argv[])
 {
-    UDSClient client{};
+    UDSClient<StringBufferWithMetaData> client{};
 
-    auto message = "Whats up you nerd.";
-    std::array<char, 255> buffer{};
-    strncpy(buffer.data(), message, strlen(message)+1);
+    auto data = StringBufferWithMetaData{"NerdMan", 
+                                        "This guy transfers objects by magic!", 
+                                        21};
 
-    if (auto ret = client.send_msg(buffer)) {}
+    if (auto ret = client.send_msg(data)) {}
     else
     {
         std::cout << "No info gathered for send failure.\n";
