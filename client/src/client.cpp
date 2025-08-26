@@ -12,6 +12,7 @@
 #include "character_buffer.hpp"
 
 template <typename T>
+requires std::is_trivial_v<T>
 class UDSClient
 {
 public:

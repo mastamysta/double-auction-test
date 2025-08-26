@@ -9,11 +9,13 @@
 #include <format>
 #include <expected>
 #include <string>
+#include <type_traits>
 
 #include "book.hpp"
 #include "character_buffer.hpp"
 
 template <typename T>
+requires std::is_trivial_v<T>
 class UDSBookServer
 {
 public:
