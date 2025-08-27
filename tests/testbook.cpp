@@ -5,41 +5,41 @@
 
 #include "book.hpp"
 
-TEST(book_tests, can_instantiate)
+class BasicOrderBookTest: public testing::Test
 {
-    book b;
-}
+protected:
+    Book b;
 
-TEST(book_tests, can_buy)
+    auto setUp()
+    {
+        std::cout << "Doing setup\n";
+        b = {};
+    }
+};
+
+TEST_F(BasicOrderBookTest, can_buy)
 {
-    book b;
-
     b.limit_buy(100, 100);
 }
 
-TEST(book_tests, can_sell)
+TEST_F(BasicOrderBookTest, can_sell)
 {
-    book b;
-
     b.limit_sell(100, 100);
 }
 
-TEST(book_tests, buy_ids_are_unique)
+TEST_F(BasicOrderBookTest, buy_ids_are_unique)
 {
-    book b;
     ASSERT_NE(b.limit_buy(100, 100), b.limit_buy(100, 100));
 }
 
-TEST(book_tests, sell_ids_are_unique)
+TEST_F(BasicOrderBookTest, sell_ids_are_unique)
 {
-    book b;
     ASSERT_NE(b.limit_sell(100, 100), b.limit_sell(100, 100));
 }
 
 
-TEST(book_tests, can_match_buy_to_sell)
+TEST_F(BasicOrderBookTest, can_match_buy_to_sell)
 {
-    book b;
     std::vector<std::tuple<order_id, order_size, order_price>> cbs;
     auto cb = [&](order_id id, order_size s, order_price p){
         cbs.push_back({ id, s, p});
@@ -54,9 +54,8 @@ TEST(book_tests, can_match_buy_to_sell)
     EXPECT_EQ(bid, -1);
 }
 
-TEST(book_tests, can_match_sell_to_buy)
+TEST_F(BasicOrderBookTest, can_match_sell_to_buy)
 {
-    book b;
     std::vector<std::tuple<order_id, order_size, order_price>> cbs;
     auto cb = [&](order_id id, order_size s, order_price p){
         cbs.push_back({ id, s, p});
@@ -71,9 +70,8 @@ TEST(book_tests, can_match_sell_to_buy)
     EXPECT_EQ(sid, -1);
 }
 
-TEST(book_tests, matches_best_existing_buy_to_sell)
+TEST_F(BasicOrderBookTest, matches_best_existing_buy_to_sell)
 {
-    book b;
     std::vector<std::tuple<order_id, order_size, order_price>> cbs;
     auto cb = [&](order_id id, order_size s, order_price p){
         cbs.push_back({ id, s, p});
@@ -94,9 +92,8 @@ TEST(book_tests, matches_best_existing_buy_to_sell)
     EXPECT_EQ(sid, -1);
 }
 
-TEST(book_tests, matches_best_existing_sell_to_buy)
+TEST_F(BasicOrderBookTest, matches_best_existing_sell_to_buy)
 {
-    book b;
     std::vector<std::tuple<order_id, order_size, order_price>> cbs;
     auto cb = [&](order_id id, order_size s, order_price p){
         cbs.push_back({ id, s, p});
@@ -117,9 +114,8 @@ TEST(book_tests, matches_best_existing_sell_to_buy)
     EXPECT_EQ(bid, -1);
 }
 
-TEST(book_tests, matches_sell_to_earliest_valid_buy)
+TEST_F(BasicOrderBookTest, matches_sell_to_earliest_valid_buy)
 {
-    book b;
     std::vector<std::tuple<order_id, order_size, order_price>> cbs;
     auto cb = [&](order_id id, order_size s, order_price p){
         cbs.push_back({ id, s, p});
@@ -140,9 +136,8 @@ TEST(book_tests, matches_sell_to_earliest_valid_buy)
     EXPECT_EQ(sid, -1);
 }
 
-TEST(book_tests, matches_buy_to_earliest_valid_sell)
+TEST_F(BasicOrderBookTest, matches_buy_to_earliest_valid_sell)
 {
-    book b;
     std::vector<std::tuple<order_id, order_size, order_price>> cbs;
     auto cb = [&](order_id id, order_size s, order_price p){
         cbs.push_back({ id, s, p});
@@ -163,31 +158,26 @@ TEST(book_tests, matches_buy_to_earliest_valid_sell)
     EXPECT_EQ(bid, -1);
 }
 
-TEST(book_tests, can_cancel_buy)
+TEST_F(BasicOrderBookTest, can_cancel_buy)
 {
-    book b;
     auto bid = b.limit_buy(100, 100);
     ASSERT_TRUE(b.cancel_order(bid));
 }
 
-TEST(book_tests, can_cancel_sell)
+TEST_F(BasicOrderBookTest, can_cancel_sell)
 {
-    book b;
     auto sid = b.limit_sell(100, 100);
     ASSERT_TRUE(b.cancel_order(sid));
 }
 
-TEST(book_tests, cannot_cancel_bad_id)
+TEST_F(BasicOrderBookTest, cannot_cancel_bad_id)
 {
-    book b;
     auto sid = b.limit_sell(100, 100);
     ASSERT_FALSE(b.cancel_order(101));
 }
 
-TEST(book_tests, can_fok_sell)
+TEST_F(BasicOrderBookTest, can_fok_sell)
 {
-    book b;
-
     std::vector<std::tuple<order_id, order_size, order_price>> cbs;
     auto cb = [&](order_id id, order_size s, order_price p){
         cbs.push_back({ id, s, p});
@@ -205,10 +195,8 @@ TEST(book_tests, can_fok_sell)
     ASSERT_TRUE(fok_success);
 }
 
-TEST(book_tests, doesnt_fill_with_worse_price)
+TEST_F(BasicOrderBookTest, doesnt_fill_with_worse_price)
 {
-    book b;
-
     std::vector<std::tuple<order_id, order_size, order_price>> cbs;
     auto cb = [&](order_id id, order_size s, order_price p){
         cbs.push_back({ id, s, p});
