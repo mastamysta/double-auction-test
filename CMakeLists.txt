@@ -5,8 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED true)
 
 add_subdirectory(book)
-add_subdirectory(server)
-add_subdirectory(client)
+add_subdirectory(comms)
 add_subdirectory(protocol)
 
 add_subdirectory(extern)

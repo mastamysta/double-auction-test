@@ -1,3 +1,5 @@
+#pragma once
+
 // C
 #include <sys/socket.h>
 #include <errno.h>
@@ -13,7 +15,6 @@
 #include <type_traits>
 #include <functional>
 
-#include "book.hpp"
 #include "character_buffer.hpp"
 
 template <typename T>
@@ -92,9 +93,9 @@ private:
 
     auto wait_msg() const -> std::expected<void, ListenError>
     {
-        struct sockaddr peer_addr;
-        socklen_t other_addrlen;
-        int newsock;
+        auto peer_addr = sockaddr{};
+        auto other_addrlen = socklen_t{};
+        auto newsock{0};
 
         if ((newsock = accept(m_socket, &peer_addr, &other_addrlen)) == -1)
         {
@@ -133,24 +134,3 @@ struct std::formatter<UDSBookServer<StringBufferWithMetaData>::ListenError>
         return std::format_to(context.out(), "{}", "Some_fooey_error");
     }
 };
-
-int main(int argc, const char *argv[])
-{
-    auto server = UDSBookServer<StringBufferWithMetaData>{};
-
-    auto on_recv_callback = [](auto data){
-        std::cout << std::format("Protocol: {}\nMessage: {}\nClient ID: {}\n",
-                                 data.protocol_id,
-                                 data.buffer,
-                                 data.client_id);
-    };
-    server.post_on_recv_callback(on_recv_callback);
-
-    if (auto ret = server.start_server()) {}
-    else
-    {
-        std::cout << std::format("wait_msg() failed. {}\n", ret.error());
-    }
-
-    return 0;
-}
