@@ -19,7 +19,7 @@
 
 template <typename T>
 requires std::is_trivial_v<T>
-class UDSBookServer
+class UDSServer
 {
 public:
     enum class ListenError
@@ -28,7 +28,7 @@ public:
         RecvFailed
     };
 
-    UDSBookServer()
+    UDSServer()
     {
         m_socket = socket(AF_UNIX, SOCK_STREAM, DEFAULT_PROTOCOL);
 
@@ -58,13 +58,13 @@ public:
     }
 
     // Taking a copy of a file descriptor is not meaningful.
-    UDSBookServer(const UDSBookServer& other) = delete;
-    UDSBookServer operator=(const UDSBookServer& other) = delete;
+    UDSServer(const UDSServer& other) = delete;
+    UDSServer operator=(const UDSServer& other) = delete;
 
-    UDSBookServer(UDSBookServer&& other) = delete;
-    UDSBookServer operator=(UDSBookServer&& other) = delete;
+    UDSServer(UDSServer&& other) = delete;
+    UDSServer operator=(UDSServer&& other) = delete;
 
-    ~UDSBookServer()
+    ~UDSServer()
     {
         close(m_socket);
     }
@@ -122,14 +122,14 @@ private:
 };
 
 template<>
-struct std::formatter<UDSBookServer<StringBufferWithMetaData>::ListenError>
+struct std::formatter<UDSServer<StringBufferWithMetaData>::ListenError>
 {
     constexpr auto parse(std::format_parse_context& context)
     {
         return context.begin();
     }
 
-    auto format(const UDSBookServer<StringBufferWithMetaData>::ListenError& err, std::format_context& context) const
+    auto format(const UDSServer<StringBufferWithMetaData>::ListenError& err, std::format_context& context) const
     {
         return std::format_to(context.out(), "{}", "Some_fooey_error");
     }

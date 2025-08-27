@@ -6,7 +6,7 @@
 
 int main(int argc, const char *argv[])
 {
-    auto server = UDSBookServer<StringBufferWithMetaData>{};
+    auto server = UDSServer<StringBufferWithMetaData>{};
 
     auto on_recv_callback = [](auto data){
         std::cout << std::format("Protocol: {}\nMessage: {}\nClient ID: {}\n",
