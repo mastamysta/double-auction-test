@@ -10,8 +10,6 @@ class ExchangeServer
 public:
     ExchangeServer()
     {
-        m_server.start_server();    
-        
         auto on_recv_callback = [](auto data){
         std::cout << std::format("Protocol: {}\nMessage: {}\nClient ID: {}\n",
                                  data.protocol_id,
@@ -19,6 +17,8 @@ public:
                                  data.client_id);
         };
         m_server.post_on_recv_callback(on_recv_callback);
+        
+        m_server.start_server();    
     }
 
 private:
