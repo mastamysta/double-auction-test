@@ -8,6 +8,7 @@ add_subdirectory(book)
 add_subdirectory(comms)
 add_subdirectory(protocol)
 add_subdirectory(exchange)
+add_subdirectory(agents)
 
 add_subdirectory(extern)
 add_subdirectory(tests)
