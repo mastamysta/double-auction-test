@@ -1,14 +1,17 @@
 #pragma once
 
 #include "client.hpp"
-#include "character_buffer.hpp"
+#include "book_order_proto.hpp"
+
+namespace exchange
+{
 
 class ExchangeClient
 {
 private:
-    using PacketType = StringBufferWithMetaData;
+    using PacketType = order_protocol::GenericMessage;
     using ClientType = UDSClient<PacketType>;
-
+    
 public:
     auto send_order(const PacketType& packet)
     {
@@ -16,3 +19,5 @@ public:
         return client.send_msg(packet);
     }
 };
+    
+}
