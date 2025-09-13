@@ -11,17 +11,16 @@
 #include <iostream>
 #include <expected>
 
+#include "socket_ops.hpp"
+
+namespace exchange
+{
+ 
 template <typename T>
 requires std::is_trivial_v<T>
 class UDSClient
 {
 public:
-    enum class SendError
-    {
-        ConnectFailed,
-        SendFailed
-    };
-
     UDSClient()
     {
         if ((m_socket = socket(AF_UNIX, SOCK_STREAM, DEFAULT_PROTOCOL)) == -1)
@@ -43,7 +42,7 @@ public:
         close(m_socket);
     }
 
-    auto send_msg(const T& data) const -> std::expected<void, SendError>
+    auto send_msg(const T& data) const -> std::expected<void, SocketError>
     {
         auto addr = sockaddr_un{};
         memset(&addr, 0, sizeof(struct sockaddr_un));
@@ -53,13 +52,13 @@ public:
         if (connect(m_socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) == -1)
         {
             std::cout << std::format("Failed to connect socket. {}\n", errno);
-            return std::unexpected(SendError::ConnectFailed);
+            return std::unexpected(SocketError::ConnectFailed);
         }
 
         if (send(m_socket, reinterpret_cast<const char*>(&data), sizeof(T), 0) == -1)
         {
             std::cout << std::format("Failed to write to socket {}\n", errno);
-            return std::unexpected(SendError::SendFailed);
+            return std::unexpected(SocketError::SendFailed);
         }
 
         return {};
@@ -72,3 +71,5 @@ private:
     int m_socket;
 
 };
+   
+}

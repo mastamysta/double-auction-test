@@ -15,19 +15,16 @@
 #include <type_traits>
 #include <functional>
 
-#include "character_buffer.hpp"
+#include "socket_ops.hpp"
+
+namespace exchange
+{
 
 template <typename T>
 requires std::is_trivial_v<T>
 class UDSServer
 {
 public:
-    enum class ListenError
-    {
-        AcceptFailed,
-        RecvFailed
-    };
-
     UDSServer()
     {
         m_socket = socket(AF_UNIX, SOCK_STREAM, DEFAULT_PROTOCOL);
@@ -74,9 +71,9 @@ public:
         m_recv_callback = recv_callback;
     }
 
-    auto start_server() const -> std::expected<void, ListenError>
+    auto start_server() const -> std::expected<void, SocketError>
     {
-        auto ret = std::expected<void, ListenError>{};
+        auto ret = std::expected<void, SocketError>{};
 
         while(ret = wait_msg()) { ; }
 
@@ -91,7 +88,7 @@ private:
     int m_socket;
     std::function<void(const T&)> m_recv_callback;
 
-    auto wait_msg() const -> std::expected<void, ListenError>
+    auto wait_msg() const -> std::expected<void, SocketError>
     {
         auto peer_addr = sockaddr{};
         auto other_addrlen = socklen_t{};
@@ -100,7 +97,7 @@ private:
         if ((newsock = accept(m_socket, &peer_addr, &other_addrlen)) == -1)
         {
             std::cout << std::format("Unable to accept on socket. Errno: {}\n", errno);
-            return std::unexpected{ListenError::AcceptFailed};
+            return std::unexpected{SocketError::AcceptFailed};
         }
 
         auto received_object = T{};
@@ -108,7 +105,7 @@ private:
         if (recv(newsock, &received_object, sizeof(T), 0) == -1)
         {
             std::cout << std::format("Unable to read socket. Errno: {}\n", errno);
-            return std::unexpected{ListenError::RecvFailed};
+            return std::unexpected{SocketError::RecvFailed};
         }
 
         if (m_recv_callback)
@@ -121,16 +118,4 @@ private:
 
 };
 
-template<>
-struct std::formatter<UDSServer<StringBufferWithMetaData>::ListenError>
-{
-    constexpr auto parse(std::format_parse_context& context)
-    {
-        return context.begin();
-    }
-
-    auto format(const UDSServer<StringBufferWithMetaData>::ListenError& err, std::format_context& context) const
-    {
-        return std::format_to(context.out(), "{}", "Some_fooey_error");
-    }
-};
+}

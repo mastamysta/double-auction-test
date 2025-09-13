@@ -7,6 +7,7 @@
 #include "book.hpp"
 
 using namespace order_protocol;
+using namespace exchange;
 
 class ExchangeServer
 {

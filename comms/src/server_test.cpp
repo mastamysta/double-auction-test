@@ -4,6 +4,8 @@
 #include "server.hpp"
 #include "character_buffer.hpp"
 
+using namespace exchange;
+
 int main(int argc, const char *argv[])
 {
     auto server = UDSServer<StringBufferWithMetaData>{};
@@ -19,7 +21,7 @@ int main(int argc, const char *argv[])
     if (auto ret = server.start_server()) {}
     else
     {
-        std::cout << std::format("wait_msg() failed. {}\n", ret.error());
+        std::cout << std::format("wait_msg() failed. {}\n", "Foobar");
     }
 
     return 0;

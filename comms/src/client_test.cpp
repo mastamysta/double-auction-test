@@ -3,6 +3,8 @@
 #include "client.hpp"
 #include "character_buffer.hpp"
 
+using namespace exchange;
+
 int main(int argc, const char *argv[])
 {
     UDSClient<StringBufferWithMetaData> client{};

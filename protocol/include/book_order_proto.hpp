@@ -11,7 +11,8 @@ enum class MessageTypeID
 {
     LIMIT,
     FOK,
-    CANCEL
+    CANCEL,
+    LIM_RESP
 };
 
 enum class Side
@@ -34,13 +35,20 @@ struct CancelDetails
     OrderIDType order_id;
 };
 
+struct LimitResponseDetails
+{
+    bool filled;
+    OrderIDType order_id;
+};
+
 struct GenericMessage
 {
     MessageTypeID message_type;
 
     union { LimitDetails lim;
             FOKDetails fok;
-            CancelDetails can; } details;
+            CancelDetails can;
+            LimitResponseDetails lresp; } details;
 };
 
 }
