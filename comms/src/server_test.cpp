@@ -15,13 +15,14 @@ int main(int argc, const char *argv[])
                                  data.protocol_id,
                                  data.buffer,
                                  data.client_id);
+        return data;
     };
-    server.post_on_recv_callback(on_recv_callback);
+    server.post_response_gen_callback(on_recv_callback);
 
     if (auto ret = server.start_server()) {}
     else
     {
-        std::cout << std::format("wait_msg() failed. {}\n", "Foobar");
+        std::cout << std::format("wait_msg() failed. \n");
     }
 
     return 0;

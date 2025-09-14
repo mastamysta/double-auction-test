@@ -13,11 +13,18 @@ int main(int argc, const char *argv[])
                                         "This guy transfers objects by magic!", 
                                         21};
 
-    if (auto ret = client.send_msg(data)) {}
-    else
+    // if (auto ret = client.send_msg(data)) {}
+    // else
+    // {
+    //     std::cout << "No info gathered for send failure.\n";
+    // }
+
+    if (auto ret = client.send_msg_and_get_response(data))
     {
-        std::cout << "No info gathered for send failure.\n";
+        std::cout << "Success.\n";
     }
+    else
+        std::cout << "Failure.\n";
 
     return 0;
 }

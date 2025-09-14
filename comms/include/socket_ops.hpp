@@ -32,7 +32,7 @@ namespace exchange
     auto do_accept(const int& listen_socket) -> std::expected<int, SocketError>
     {
         sockaddr peer_addr;
-        socklen_t peer_addrlen;
+        socklen_t peer_addrlen = sizeof(sockaddr);
 
         auto sock = accept(listen_socket, &peer_addr, &peer_addrlen);
 

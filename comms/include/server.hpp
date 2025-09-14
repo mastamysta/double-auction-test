@@ -14,6 +14,7 @@
 #include <string>
 #include <type_traits>
 #include <functional>
+#include <csignal>
 
 #include "socket_ops.hpp"
 
@@ -64,6 +65,7 @@ public:
 
     ~UDSServer()
     {
+        std::cout << "DTor.\n";
         close(m_socket);
     }
 
