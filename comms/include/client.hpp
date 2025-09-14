@@ -16,8 +16,9 @@
 namespace exchange
 {
  
-template <typename T>
-requires std::is_trivial_v<T>
+template <typename MessageType, typename ResponseType = MessageType>
+requires std::is_trivial_v<MessageType> &&
+            std::is_trivial_v<ResponseType>
 class UDSClient
 {
 public:
@@ -42,26 +43,40 @@ public:
         close(m_socket);
     }
 
-    auto send_msg(const T& data) const -> std::expected<void, SocketError>
+    auto send_msg(const MessageType& data) const -> std::expected<void, SocketError>
     {
-        auto addr = sockaddr_un{};
-        memset(&addr, 0, sizeof(struct sockaddr_un));
-        addr.sun_family = AF_UNIX;
-        strncpy(addr.sun_path, SOCKET_PATH, sizeof(SOCKET_PATH) - 1);
+        if (auto ret = do_connect(m_socket, SOCKET_PATH))
+        {}
+        else
+            return ret;
 
-        if (connect(m_socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) == -1)
-        {
-            std::cout << std::format("Failed to connect socket. {}\n", errno);
-            return std::unexpected(SocketError::ConnectFailed);
-        }
-
-        if (send(m_socket, reinterpret_cast<const char*>(&data), sizeof(T), 0) == -1)
-        {
-            std::cout << std::format("Failed to write to socket {}\n", errno);
-            return std::unexpected(SocketError::SendFailed);
-        }
+        if (auto ret = do_send(m_socket, data))
+        {}
+        else
+            return ret;
 
         return {};
+    }
+
+    auto send_msg_and_get_response(const MessageType& data) const -> std::expected<ResponseType, SocketError>
+    {
+        if (auto ret = do_connect(m_socket, SOCKET_PATH))
+        {}
+        else
+            return ret;
+
+        if (auto ret = do_send(m_socket, data))
+        {}
+        else
+            return std::unexpected{ret.error()};
+
+        auto response = ResponseType{};
+
+        if (auto ret = do_recv(m_socket, response))
+            return {response};
+        else
+            return std::unexpected{ret.error()};
+
     }
 
 private:

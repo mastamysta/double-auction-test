@@ -20,8 +20,9 @@
 namespace exchange
 {
 
-template <typename T>
-requires std::is_trivial_v<T>
+template <typename MessageType, typename ResponseType = MessageType>
+requires std::is_trivial_v<MessageType> && 
+            std::is_trivial_v<ResponseType>
 class UDSServer
 {
 public:
@@ -66,7 +67,7 @@ public:
         close(m_socket);
     }
 
-    auto post_on_recv_callback(std::function<void(const T&)> recv_callback)
+    auto post_on_recv_callback(std::function<void(const MessageType&)> recv_callback)
     {
         m_recv_callback = recv_callback;
     }
@@ -86,36 +87,68 @@ private:
     static constexpr int DEFAULT_PROTOCOL = 0;
 
     int m_socket;
-    std::function<void(const T&)> m_recv_callback;
+    std::function<void(const MessageType&)> m_recv_callback;
+    std::function<ResponseType(const MessageType&)> m_response_gen_callback;
 
     auto wait_msg() const -> std::expected<void, SocketError>
     {
-        auto peer_addr = sockaddr{};
-        auto other_addrlen = socklen_t{};
-        auto newsock{0};
+        auto incoming_socket{-1};
 
-        if ((newsock = accept(m_socket, &peer_addr, &other_addrlen)) == -1)
+        if (auto ret = do_accept(m_socket))
         {
-            std::cout << std::format("Unable to accept on socket. Errno: {}\n", errno);
-            return std::unexpected{SocketError::AcceptFailed};
+            incoming_socket = ret.value();
         }
+        else
+            return std::unexpected(ret.error());
 
-        auto received_object = T{};
+        auto received_object = MessageType{};
 
-        if (recv(newsock, &received_object, sizeof(T), 0) == -1)
-        {
-            std::cout << std::format("Unable to read socket. Errno: {}\n", errno);
-            return std::unexpected{SocketError::RecvFailed};
-        }
+        if (auto ret = do_recv(incoming_socket, received_object))
+        {}
+        else
+            return ret;
+        
 
         if (m_recv_callback)
             m_recv_callback(received_object);
 
-        close(newsock);
+        close(incoming_socket);
 
         return {};
     }
 
+    auto wait_msg_and_respond() const -> std::expected<void, SocketError>
+    {
+        auto incoming_socket{-1};
+
+        if (auto ret = do_accept(m_socket))
+        {
+            incoming_socket = ret.value();
+        }
+        else
+            return std::unexpected(ret.error());
+
+        auto received_object = MessageType{};
+
+        if (auto ret = do_recv(incoming_socket, received_object))
+        {}
+        else
+            return ret;
+
+        auto response = ResponseType{};
+
+        if (m_response_gen_callback)
+            response = m_response_gen_callback(received_object);
+
+        if (auto ret = do_send(incoming_socket, response))
+        {}
+        else
+            return ret;
+
+        close(incoming_socket);
+
+        return {};
+    }
 };
 
 }
