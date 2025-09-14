@@ -63,7 +63,7 @@ public:
         if (auto ret = do_connect(m_socket, SOCKET_PATH))
         {}
         else
-            return ret;
+            return std::unexpected{ret.error()};
 
         if (auto ret = do_send(m_socket, data))
         {}

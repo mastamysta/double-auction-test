@@ -16,7 +16,7 @@ public:
     auto send_order(const PacketType& packet)
     {
         auto client = ClientType{};
-        return client.send_msg(packet);
+        return client.send_msg_and_get_response(packet);
     }
 };
     

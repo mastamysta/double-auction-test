@@ -72,13 +72,18 @@ public:
         m_recv_callback = recv_callback;
     }
 
+    auto post_response_gen_callback(std::function<ResponseType(const MessageType&)> resp_callback)
+    {
+        m_response_gen_callback = resp_callback;
+    }
+
     auto start_server() const -> std::expected<void, SocketError>
     {
         auto ret = std::expected<void, SocketError>{};
 
-        while(ret = wait_msg()) { ; }
+        while(ret = wait_msg_and_respond()) { ; }
 
-        return ret;
+        return std::unexpected(ret.error());
     }
 
 private:

@@ -12,7 +12,9 @@ enum class MessageTypeID
     LIMIT,
     FOK,
     CANCEL,
-    LIM_RESP
+    LIM_RESP,
+    FOK_RESP,
+    CAN_RESP
 };
 
 enum class Side
@@ -41,6 +43,16 @@ struct LimitResponseDetails
     OrderIDType order_id;
 };
 
+struct FOKResponseDetails
+{
+    bool filled;
+};
+
+struct CancelResponseDetails
+{
+    bool cancelled;
+};
+
 struct GenericMessage
 {
     MessageTypeID message_type;
@@ -48,7 +60,9 @@ struct GenericMessage
     union { LimitDetails lim;
             FOKDetails fok;
             CancelDetails can;
-            LimitResponseDetails lresp; } details;
+            LimitResponseDetails lresp;
+            FOKResponseDetails fresp;
+            CancelResponseDetails cresp; } details;
 };
 
 }

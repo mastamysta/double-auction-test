@@ -37,16 +37,17 @@ inline auto better_sell = [](order* lhs, order* rhs){ return lhs->price < rhs->p
 class Book
 {
 public:
+    using OrderIDType = order_id;
 
-    auto limit_buy(order_size, order_price) -> order_id;
+    auto limit_buy(order_size, order_price) -> OrderIDType;
 
-    auto limit_sell(order_size, order_price) -> order_id;
+    auto limit_sell(order_size, order_price) -> OrderIDType;
 
     auto fok_buy(order_size, order_price) -> bool;
 
     auto fok_sell(order_size, order_price) -> bool;
 
-    auto cancel_order(order_id id) -> bool;
+    auto cancel_order(OrderIDType id) -> bool;
 
     auto post_order_complete_callback(order_complete_cb) -> void;
 
@@ -55,7 +56,7 @@ private:
     order_complete_cb _cb;
     std::set<order*, decltype(better_buy)> buy_book;
     std::set<order*, decltype(better_sell)> sell_book; // Take advantage of RB tree used to order set.
-    std::map<order_id, order*> order_list;
+    std::map<OrderIDType, order*> order_list;
 
     template <order_type OrderType>
     requires (OrderType == order_type::LIM_BUY || OrderType == order_type::FOK_BUY)
@@ -93,6 +94,7 @@ private:
 
     template <order_type OrderType>
     auto action(order_size, order_price, bool);
+
 };
 
 union uuid_hack
@@ -184,7 +186,7 @@ inline auto Book::action(order_size size, order_price price, bool dry_run)
 }
 
 template <order_type OrderType>
-inline auto Book::common_add_order(order_size size, order_price price) -> order_id
+inline auto Book::common_add_order(order_size size, order_price price) -> OrderIDType
 {
     auto remaining_size = action<OrderType>(size, price, false);
     
@@ -210,11 +212,11 @@ inline auto Book::common_fok_order(order_size size, order_price price) -> bool
     return true;
 }
 
-inline auto Book::limit_buy(order_size size, order_price price) -> order_id
+inline auto Book::limit_buy(order_size size, order_price price) -> OrderIDType
 {
     return common_add_order<order_type::LIM_BUY>(size, price);
 }
-inline auto Book::limit_sell(order_size size, order_price price) -> order_id
+inline auto Book::limit_sell(order_size size, order_price price) -> OrderIDType
 {
     return common_add_order<order_type::LIM_SELL>(size, price);
 }
@@ -227,7 +229,7 @@ inline auto Book::fok_sell(order_size size, order_price price) -> bool
     return common_fok_order<order_type::FOK_SELL>(size, price);
 }
 
-inline auto Book::cancel_order(order_id id) -> bool
+inline auto Book::cancel_order(OrderIDType id) -> bool
 {
     if (order_list.find(id) == order_list.end())
         return false;
