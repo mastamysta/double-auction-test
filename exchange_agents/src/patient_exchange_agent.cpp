@@ -1,3 +1,8 @@
+#include <expected>
+#include <ranges>
+#include <chrono>
+#include <thread>
+
 #include "patient_agent.hpp"
 #include "exchange_client.hpp"
 #include "book_order_proto.hpp"
@@ -36,9 +41,6 @@ private:
     PatientAgent m_agent;
     ExchangeClient m_client;
 
-    std::function<bool(PatientAgent::OrderIDType)> cancel_callback_wrapper;
-    std::function<PatientAgent::OrderIDType(std::size_t, std::size_t)> place_callback_wrapper;
-
     bool cancel_callback(PatientAgent::OrderIDType order_id)
     {
         auto packet = order_protocol::GenericMessage{};
@@ -54,7 +56,8 @@ private:
             return false;
     }
 
-    PatientAgent::OrderIDType place_callback(std::size_t order_size, std::size_t order_price)
+    auto place_callback(std::size_t order_size, 
+                        std::size_t order_price) -> std::expected<PatientAgent::OrderIDType, PatientAgent::PlaceOutcome>
     {
         auto packet = order_protocol::GenericMessage{};
         packet.message_type = order_protocol::MessageTypeID::LIMIT;
@@ -71,14 +74,14 @@ private:
                 std::cout << "Somehow we got the wrong response type.\n";
 
             if (response.details.lresp.filled)
-                return -2;
+                return std::unexpected(PatientAgent::PlaceOutcome::FILLED_IMMEDIATELY);
 
-            return response.details.lresp.order_id;
+            return {response.details.lresp.order_id};
         }
         else
         {
             std::cout << "Send error!\n";
-            return -1;
+            return std::unexpected(PatientAgent::PlaceOutcome::FAILED);
         }
     }
 };
@@ -90,7 +93,14 @@ using namespace exchange;
 int main(int argc, const char *argv[])
 {
     auto agent = PatientExchangeAgent{};
-    agent.act();
+
+    auto backoff_time = std::chrono::seconds{1};
+
+    for (auto _: std::ranges::iota_view{0, 10})
+    {
+        agent.act();
+        std::this_thread::sleep_for(backoff_time);
+    }
 
     return 0;
 }

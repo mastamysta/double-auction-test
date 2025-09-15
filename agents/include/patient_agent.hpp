@@ -7,6 +7,7 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <format>
 
 namespace exchange
 {
@@ -15,6 +16,14 @@ class PatientAgent
 {
 public:
     using OrderIDType = std::size_t;
+    
+    enum class PlaceOutcome
+    {
+        FILLED_IMMEDIATELY,
+        FAILED
+    };
+    
+    using PlaceOrderCallbackType = std::function<std::expected<OrderIDType, PlaceOutcome>(std::size_t, std::size_t)>;
     
     PatientAgent(double order_placement_rate, 
                  double order_cancellation_rate,
@@ -32,7 +41,7 @@ public:
 
     auto act();
 
-    auto post_place_callback(std::function<OrderIDType(std::size_t, std::size_t)> place_callback)
+    auto post_place_callback(PlaceOrderCallbackType place_callback)
     {
         m_place_callback = place_callback;
     }
@@ -53,7 +62,7 @@ private:
 
     std::vector<OrderIDType> m_active_orders;
     std::function<bool(OrderIDType)> m_cancel_callback;
-    std::function<OrderIDType(std::size_t, std::size_t)> m_place_callback;
+    PlaceOrderCallbackType m_place_callback;
 
     auto try_cancel_order()
     {
@@ -72,8 +81,10 @@ private:
 
             if (success)
                 m_active_orders.erase(m_active_orders.begin() + index_to_cancel);
-            
-            // TODO: If not successful, was the order already filled?
+            else
+                // TODO: If not successful, was the order already filled?
+                // For now, remove it all the same.
+                m_active_orders.erase(m_active_orders.begin() + index_to_cancel);
         }
     }
 
@@ -87,10 +98,20 @@ private:
             auto price_dist = std::uniform_real_distribution<double>(0, std::log(current_best));
             auto price = std::exp(price_dist(m_eng));
 
-            auto order_id = m_place_callback(m_order_size, price);
+            if (auto ret = m_place_callback(m_order_size, price))
+            {
+                m_active_orders.push_back(ret.value());
+            }
+            else if (ret.error() == PlaceOutcome::FILLED_IMMEDIATELY)
+            {
+                // Don't add to the active order list, possibly use this
+                // to tracl P/L metrics.
+            }
+            else
+            {
+                std::cout << std::format("Placement failed.");
+            }
 
-            if (order_id != -1)
-                m_active_orders.push_back(order_id);
         }
     }
 };
