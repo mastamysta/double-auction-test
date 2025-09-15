@@ -22,15 +22,22 @@ public:
         FILLED_IMMEDIATELY,
         FAILED
     };
+
+    enum class Side: int
+    {
+        BUY = 0,
+        SELL = 1
+    };
     
-    using PlaceOrderCallbackType = std::function<std::expected<OrderIDType, PlaceOutcome>(std::size_t, std::size_t)>;
-    
+    using PlaceOrderCallbackType = std::function<std::expected<OrderIDType, PlaceOutcome>(Side, std::size_t, std::size_t)>;
+
     PatientAgent(double order_placement_rate, 
                  double order_cancellation_rate,
                  std::size_t order_size): 
         m_placement_distribution({order_placement_rate}),
         m_cancellation_distribution({order_cancellation_rate}),
-        m_order_size(order_size)
+        m_order_size(order_size),
+        m_buy_side_distribution(0, 1)
     {
         auto rd = std::random_device{};
         auto seed_data = std::array<SeedType, RandomGeneratorType::state_size>{};
@@ -58,6 +65,7 @@ private:
     RandomGeneratorType m_eng;
     std::poisson_distribution<unsigned> m_placement_distribution;
     std::poisson_distribution<unsigned> m_cancellation_distribution;
+    std::uniform_int_distribution<unsigned> m_buy_side_distribution;
     unsigned m_order_size;
 
     std::vector<OrderIDType> m_active_orders;
@@ -88,17 +96,18 @@ private:
         }
     }
 
-    auto try_place_order()
+    auto try_place_order() -> bool
     {
         auto orders_to_place = m_placement_distribution(m_eng);
 
         for (auto _: std::views::iota(0u, orders_to_place))
         {
-            auto current_best = 0.0;
+            auto current_best = 45.0;
             auto price_dist = std::uniform_real_distribution<double>(0, std::log(current_best));
             auto price = std::exp(price_dist(m_eng));
+            auto side = static_cast<Side>(m_buy_side_distribution(m_eng));
 
-            if (auto ret = m_place_callback(m_order_size, price))
+            if (auto ret = m_place_callback(side, m_order_size, price))
             {
                 m_active_orders.push_back(ret.value());
             }
@@ -110,16 +119,18 @@ private:
             else
             {
                 std::cout << std::format("Placement failed.");
+                return false;
             }
-
         }
+
+        return true;
     }
 };
     
 auto PatientAgent::act()
 {
     try_cancel_order();
-    try_place_order();
+    return try_place_order();
 }
 
 }

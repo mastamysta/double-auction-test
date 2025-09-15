@@ -19,8 +19,10 @@ public:
             order_size)
     {
         m_agent.post_place_callback(
-        [&](std::size_t order_size, std::size_t order_price){
-            return this->place_callback(order_size, order_price);
+        [&](PatientAgent::Side side, 
+            std::size_t order_size,
+            std::size_t order_price){
+            return this->place_callback(side, order_size, order_price);
         });
         m_agent.post_cancel_callback(
         [&](auto order_id){
@@ -30,7 +32,7 @@ public:
 
     auto act()
     {
-        m_agent.act();
+        return m_agent.act();
     }
 private:
     // 0.4 per timestep
@@ -56,15 +58,19 @@ private:
             return false;
     }
 
-    auto place_callback(std::size_t order_size, 
+    auto place_callback(PatientAgent::Side side,
+                        std::size_t order_size, 
                         std::size_t order_price) -> std::expected<PatientAgent::OrderIDType, PatientAgent::PlaceOutcome>
     {
         auto packet = order_protocol::GenericMessage{};
         packet.message_type = order_protocol::MessageTypeID::LIMIT;
+        auto proto_side = side == PatientAgent::Side::BUY ? 
+                                    order_protocol::Side::BUY : 
+                                    order_protocol::Side::SELL;
         packet.details.lim = 
             order_protocol::LimitDetails{order_price, 
                                          order_size,
-                                         order_protocol::Side::BUY};
+                                         proto_side};
 
         if (auto ret = m_client.send_order(packet)) 
         {
@@ -94,11 +100,13 @@ int main(int argc, const char *argv[])
 {
     auto agent = PatientExchangeAgent{};
 
-    auto backoff_time = std::chrono::seconds{1};
+    auto backoff_time = std::chrono::milliseconds{1};
 
-    for (auto _: std::ranges::iota_view{0, 10})
+    for (auto _: std::ranges::iota_view{0, 1000})
     {
-        agent.act();
+        if (!agent.act())
+            break;
+
         std::this_thread::sleep_for(backoff_time);
     }
 

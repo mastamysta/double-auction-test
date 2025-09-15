@@ -135,7 +135,7 @@ constexpr inline auto get_is_better()
 template <order_type OrderType>
 inline auto Book::action(order_size size, order_price price, bool dry_run)
 {
-    auto opposing_book = get_opposing_order_book<OrderType>();
+    auto& opposing_book = get_opposing_order_book<OrderType>();
     constexpr auto better = get_is_better<OrderType>();
     bool erase_last = true;
     auto best = opposing_book.begin();
@@ -153,7 +153,9 @@ inline auto Book::action(order_size size, order_price price, bool dry_run)
 
                 if (!dry_run)
                 {
-                    _cb((*best)->id, (*best)->size, (*best)->price);
+                    if (_cb)
+                        _cb((*best)->id, (*best)->size, (*best)->price);
+
                     order_list.erase((*best)->id);
                     delete *best;
                 }
@@ -162,7 +164,9 @@ inline auto Book::action(order_size size, order_price price, bool dry_run)
             {
                 if (!dry_run)
                 {
-                    _cb((*best)->id, (*best)->size - size, (*best)->price);
+                    if (_cb)
+                        _cb((*best)->id, (*best)->size - size, (*best)->price);
+                    
                     (*best)->size -= size;
                 }
 
