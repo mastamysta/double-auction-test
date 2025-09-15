@@ -53,7 +53,6 @@ private:
             }
 
             break;
-
         }
         case MessageTypeID::FOK:
         {

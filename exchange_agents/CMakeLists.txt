@@ -1,0 +1,2 @@
+add_executable(patient_exchange_agent ./src/patient_exchange_agent.cpp)
+target_link_libraries(patient_exchange_agent agents exchange_client)

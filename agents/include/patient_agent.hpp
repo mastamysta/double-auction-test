@@ -6,6 +6,7 @@
 #include <functional>
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 
 namespace exchange
 {
@@ -17,14 +18,10 @@ public:
     
     PatientAgent(double order_placement_rate, 
                  double order_cancellation_rate,
-                 std::size_t order_size,
-                 std::function<bool(OrderIDType)> cancel_callback,
-                 std::function<OrderIDType(std::size_t, std::size_t)> place_callback): 
+                 std::size_t order_size): 
         m_placement_distribution({order_placement_rate}),
         m_cancellation_distribution({order_cancellation_rate}),
-        m_order_size(order_size),
-        m_cancel_callback(cancel_callback),
-        m_place_callback(place_callback)
+        m_order_size(order_size)
     {
         auto rd = std::random_device{};
         auto seed_data = std::array<SeedType, RandomGeneratorType::state_size>{};
@@ -34,6 +31,16 @@ public:
     }
 
     auto act();
+
+    auto post_place_callback(std::function<OrderIDType(std::size_t, std::size_t)> place_callback)
+    {
+        m_place_callback = place_callback;
+    }
+
+    auto post_cancel_callback(std::function<bool(OrderIDType)> cancel_callback)
+    {
+        m_cancel_callback = cancel_callback;
+    }
 
 private:
     using SeedType = int;
@@ -52,16 +59,21 @@ private:
     {
         auto orders_to_cancel = m_cancellation_distribution(m_eng);
 
+        if (orders_to_cancel > m_active_orders.size())
+            orders_to_cancel = m_active_orders.size();
+
         for (auto _: std::views::iota(0u, orders_to_cancel))
         {
             auto index_dist =
-                 std::uniform_int_distribution<unsigned long>{0, m_active_orders.size()-1};
+                 std::uniform_int_distribution<unsigned long>{0, m_active_orders.size()};
 
             auto index_to_cancel = index_dist(m_eng);
             auto success = m_cancel_callback(m_active_orders[index_to_cancel]);
 
             if (success)
                 m_active_orders.erase(m_active_orders.begin() + index_to_cancel);
+            
+            // TODO: If not successful, was the order already filled?
         }
     }
 
